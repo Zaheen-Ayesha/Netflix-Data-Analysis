@@ -58,6 +58,6 @@ The objective of this project was to analyze Netflix's content library to uncove
 - The U.S., India, and Canada lead in content production.
 - Significant content growth was observed in the last decade, especially after 2015.
 
-#### 5. Executive Summary:
+### 5. Executive Summary:
 
 This project showcases my ability to clean and analyze complex datasets, derive actionable insights using SQL, and present findings through an interactive Power BI dashboard. By addressing 20 business problems, I demonstrated a comprehensive understanding of data analysis techniques and visualization best practices. The final dashboard provides a clear and engaging overview of Netflix's content library, highlighting key trends and metrics that can inform strategic decisions.
