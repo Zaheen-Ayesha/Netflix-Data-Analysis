@@ -1,6 +1,9 @@
 # Netflix Movies & TV Shows Analysis Using SQL and Power BI
 
+
+
 ### Objective:
+
 The objective of this project was to analyze Netflix's content library to uncover insights into movies and TV shows, including trends in genres, ratings, and geographical distribution. The project involved data cleaning, solving 20 business problems using SQL, and creating an interactive Power BI dashboard to visualize key metrics.
 
 ### Steps Taken:
@@ -48,12 +51,13 @@ The objective of this project was to analyze Netflix's content library to uncove
   - Global Content Distribution via Heat Maps
 
 ### 4. Results & Key Insights:
-#### - Netflix’s catalog contains 8,807 titles,
-with a majority being movies (~69%).
+
+- Netflix’s catalog contains 8,807 titles, with a majority being movies (~69%).
 - TV-MA (Mature Audience) is the most common rating, indicating a focus on adult-oriented content.
 - Top 3 genres: International Movies, Dramas, and Comedies.
 - The U.S., India, and Canada lead in content production.
 - Significant content growth was observed in the last decade, especially after 2015.
 
 #### 5. Executive Summary:
+
 This project showcases my ability to clean and analyze complex datasets, derive actionable insights using SQL, and present findings through an interactive Power BI dashboard. By addressing 20 business problems, I demonstrated a comprehensive understanding of data analysis techniques and visualization best practices. The final dashboard provides a clear and engaging overview of Netflix's content library, highlighting key trends and metrics that can inform strategic decisions.
