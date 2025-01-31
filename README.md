@@ -1,6 +1,6 @@
 # Netflix Movies & TV Shows Analysis Using SQL and Power BI
 
-
+![](https://github.com/Zaheen-Ayesha/Netflix-Data-Analysis/blob/820f37d75c2fff19d7828a36e4734c7d935e7f9a/Netflix.png)
 
 ### Objective:
 
