@@ -1,0 +1,562 @@
+select * from netflix;
+
+--Remove Duplicates
+--Checking for duplicates
+
+SELECT
+	*
+FROM
+	NETFLIX
+WHERE
+	CONCAT(UPPER(TITLE), TYPE) IN (
+		SELECT
+			CONCAT(UPPER(TITLE), TYPE)
+		FROM
+			NETFLIX
+		GROUP BY
+			UPPER(TITLE),
+			TYPE
+		HAVING
+			COUNT(*) > 1
+	)
+ORDER BY
+	TITLE;
+	
+--Removed Duplicates using the below query and also filled the missing rows in duration column, changed the data type
+--for date_added
+
+WITH
+	CTE AS (
+		SELECT
+			*,
+			ROW_NUMBER() OVER (
+				PARTITION BY
+					TITLE,
+					TYPE
+				ORDER BY
+					SHOW_ID
+			) AS RN
+		FROM
+			NETFLIX
+	)
+SELECT
+	SHOW_ID,
+	TYPE,
+	TITLE,
+	TO_DATE(TRIM(DATE_ADDED), 'Month DD,YYYY') AS DATE_ADDED,
+	RELEASE_YEAR,
+	RATING,
+	CASE
+		WHEN DURATION IS NULL THEN RATING
+		ELSE DURATION
+	END AS DURATION
+FROM
+	CTE
+WHERE
+	RN = 1;
+
+-- New table for director, Country, Listed IN, cast
+
+SELECT
+	SHOW_ID,
+	TRIM(UNNESTED_DIRECTOR) AS DIRECTOR INTO NETFLIX_DIRECTOR
+FROM
+	NETFLIX,
+	LATERAL UNNEST(STRING_TO_ARRAY(DIRECTOR, ',')) AS UNNESTED_DIRECTOR;
+
+SELECT
+	*
+FROM
+	NETFLIX_DIRECTOR;
+
+SELECT
+	SHOW_ID,
+	TRIM(UNNESTED_COUNTRY) AS COUNTRY INTO NETFLIX_COUNTRY
+FROM
+	NETFLIX,
+	LATERAL UNNEST(STRING_TO_ARRAY(COUNTRY, ',')) AS UNNESTED_COUNTRY;
+
+SELECT
+	*
+FROM
+	NETFLIX_COUNTRY;
+
+SELECT
+	SHOW_ID,
+	TRIM(UNNESTED_GENRE) AS GENRE INTO NETFLIX_GENRE
+FROM
+	NETFLIX,
+	LATERAL UNNEST(STRING_TO_ARRAY(LISTED_IN, ',')) AS UNNESTED_GENRE;
+
+SELECT
+	*
+FROM
+	NETFLIX_GENRE;
+
+SELECT
+	SHOW_ID,
+	TRIM(UNNESTED_CAST) AS CAST INTO NETFLIX_CAST
+FROM
+	NETFLIX,
+	LATERAL UNNEST(STRING_TO_ARRAY(CASTS, ',')) AS UNNESTED_CAST;
+
+SELECT
+	*
+FROM
+	NETFLIX_CAST;
+
+--Date type conversion in date_added column
+--Checking the data type of date_added
+
+SELECT
+	PG_TYPEOF(DATE_ADDED)
+FROM
+	NETFLIX
+LIMIT
+	1;
+
+-- change the data type to date
+
+SELECT
+	TO_DATE(TRIM(DATE_ADDED), 'Month DD,YYYY') AS DATE_ADDED
+FROM
+	NETFLIX;
+
+
+--Populate missing values in country columns
+INSERT INTO
+	NETFLIX_COUNTRY
+SELECT
+	SHOW_ID,
+	M.COUNTRY
+FROM
+	NETFLIX NF
+	INNER JOIN (
+		SELECT
+			DIRECTOR,
+			COUNTRY
+		FROM
+			NETFLIX_COUNTRY NC
+			INNER JOIN NETFLIX_DIRECTOR ND ON NC.SHOW_ID = ND.SHOW_ID
+		ORDER BY
+			1,
+			2
+	) M ON NF.DIRECTOR = M.DIRECTOR
+WHERE
+	NF.COUNTRY IS NULL;
+
+
+--Final Table->Cleaned and formated
+WITH
+	CTE AS (
+		SELECT
+			*,
+			ROW_NUMBER() OVER (
+				PARTITION BY
+					TITLE,
+					TYPE
+				ORDER BY
+					SHOW_ID
+			) AS RN
+		FROM
+			NETFLIX
+	)
+SELECT
+	SHOW_ID,
+	TYPE,
+	TITLE,
+	TO_DATE(TRIM(DATE_ADDED), 'Month DD,YYYY') AS DATE_ADDED,
+	RELEASE_YEAR,
+	RATING,
+	CASE
+		WHEN DURATION IS NULL THEN RATING
+		ELSE DURATION
+	END AS DURATION,
+	DESCRIPTION INTO NETFLIX1
+FROM
+	CTE;
+
+SELECT
+	*
+FROM
+	NETFLIX1;
+
+
+----BUSSINESS PROBLEMs----(EXPLORATORY DATA ANALYSIS)----
+
+--1. Count the no. of Movies VS TV Shows
+
+SELECT
+	TYPE,
+	COUNT(SHOW_ID) AS TOTAL
+FROM
+	NETFLIX1
+GROUP BY
+	1
+ORDER BY
+	2 DESC;
+	
+--2. Find the most common rating for movies and TV shows
+
+	CTE AS (
+		SELECT
+			TYPE,
+			RATING,
+			COUNT(SHOW_ID) AS RATING_COUNT
+		FROM
+			NETFLIX1
+		GROUP BY
+			1,
+			2
+	),
+	CTE2 AS (
+		SELECT
+			*,
+			RANK() OVER (
+				PARTITION BY
+					TYPE
+				ORDER BY
+					RATING_COUNT DESC
+			) AS RANK
+		FROM
+			CTE
+	)
+SELECT
+	*
+FROM
+	CTE2
+WHERE
+	RANK = 1;
+	
+
+-- 3.List all movies released in a specific year (e.g., 2020)
+
+SELECT
+	TITLE,
+	RELEASE_YEAR
+FROM
+	NETFLIX1
+WHERE
+	TYPE = 'Movie'
+	AND RELEASE_YEAR = 2020;
+
+
+-- 4. Find the top 5 countries with the most content on Netflix
+SELECT
+	COUNTRY,
+	COUNT(SHOW_ID) AS TOTAL_CONTENT
+FROM
+	NETFLIX_COUNTRY
+GROUP BY
+	COUNTRY
+ORDER BY
+	2 DESC
+LIMIT
+	5;
+
+
+-- 5.Identify the longest movie
+
+SELECT
+	TITLE,
+	CAST(REPLACE(DURATION, 'min', '') AS INTEGER) AS LONGEST_MOVIE
+FROM
+	NETFLIX1
+WHERE
+	TYPE = 'Movie'
+GROUP BY
+	1,
+	2
+ORDER BY
+	LONGEST_MOVIE DESC
+LIMIT
+	1;
+	
+	
+-- 6. Find content added in the last 5 years
+
+SELECT
+	*
+FROM
+	NETFLIX1
+WHERE
+	DATE_ADDED >= CURRENT_DATE - INTERVAL '5 YEARS';
+	
+
+-- 7. Find all the movies/TV shows by director 'Rajiv Chilaka'!
+
+SELECT
+	ND.DIRECTOR,
+	COUNT(
+		DISTINCT CASE
+			WHEN TYPE = 'Movie' THEN N.SHOW_ID
+		END
+	) AS NO_OF_MOVIES,
+	COUNT(
+		DISTINCT CASE
+			WHEN TYPE = 'TV Show' THEN N.SHOW_ID
+		END
+	) AS NO_OF_TVSHOWS
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_DIRECTOR ND ON N.SHOW_ID = ND.SHOW_ID
+WHERE
+	ND.DIRECTOR = 'Rajiv Chilaka'
+GROUP BY
+	ND.DIRECTOR
+	
+
+-- 8. List all TV shows with more than 5 seasons
+SELECT
+	*
+FROM
+	NETFLIX1
+WHERE
+	TYPE = 'TV Show'
+	AND SPLIT_PART(DURATION, ' ', 1)::INT > 5
+
+
+-- 9. Count the number of content items in each genre
+SELECT
+	GENRE,
+	COUNT(SHOW_ID) AS TOTAL_CONTENTS
+FROM
+	NETFLIX_GENRE
+GROUP BY
+	GENRE
+ORDER BY
+	TOTAL_CONTENTSDESC;
+	
+
+-- 10. Find each year and the average numbers of content release by India on netflix. 
+-- return top 5 year with highest avg content release !
+
+SELECT
+	EXTRACT(
+		YEAR
+		FROM
+			N.DATE_ADDED
+	) AS DATE_YEAR,
+	COUNT(NC.SHOW_ID) AS TOTAL_RELEASE
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_COUNTRY NC ON N.SHOW_ID = NC.SHOW_ID
+WHERE
+	NC.COUNTRY = 'India'
+GROUP BY
+	DATE_YEAR
+ORDER BY
+	TOTAL_RELEASE DESC
+LIMIT
+	5;
+
+-- 11. List all movies that are documentaries
+SELECT
+	N.TITLE,
+	NG.GENRE
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_GENRE NG ON N.SHOW_ID = NG.SHOW_ID
+WHERE
+	N.TYPE = 'Movie'
+	AND NG.GENRE = 'Documentaries';
+	
+
+-- 12. Find all content without a director
+SELECT
+	N.TITLE,
+	ND.DIRECTOR
+FROM
+	NETFLIX1 N
+	LEFT JOIN NETFLIX_DIRECTOR ND ON N.SHOW_ID = ND.SHOW_ID
+WHERE
+	ND.DIRECTOR ISNULL;
+
+
+-- 13. Find how many movies actor 'Salman Khan' appeared in last 10 years!
+
+SELECT
+	N.RELEASE_YEAR,
+	N.TITLE,
+	NC.CAST
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_CAST NC ON N.SHOW_ID = NC.SHOW_ID
+WHERE
+	NC.CAST = 'Salman Khan'
+	AND RELEASE_YEAR > EXTRACT(
+		YEAR
+		FROM
+			CURRENT_DATE
+	) - 10
+	
+
+-- 14. Find the top 10 actors who have appeared in the highest number of movies produced in India.
+
+SELECT
+	NC.CAST,
+	COUNT(N.SHOW_ID) AS TOTAL_MOVIES
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_CAST NC ON N.SHOW_ID = NC.SHOW_ID
+	INNER JOIN NETFLIX_COUNTRY NY ON N.SHOW_ID = NY.SHOW_ID
+WHERE
+	NY.COUNTRY = 'India'
+	AND N.TYPE = 'Movie'
+GROUP BY
+	NC.CAST
+ORDER BY
+	TOTAL_MOVIES DESC
+LIMIT
+	10
+
+
+-- 15. Categorize the content based on the presence of the keywords 'kill' and 'violence' in 
+--the description field. Label content containing these keywords as 'Bad' and all other 
+--content as 'Good'. Count how many items fall into each category.
+
+SELECT 
+    category,
+	TYPE,
+    COUNT(*) AS content_count
+FROM (
+    SELECT 
+		*,
+        CASE 
+            WHEN description ILIKE '%kill%' OR description ILIKE '%violence%' THEN 'Bad'
+            ELSE 'Good'
+        END AS category
+    FROM netflix1
+) AS categorized_content
+GROUP BY 1,2
+ORDER BY 2
+
+
+-- 16. For each director find the number of movies and TV shows they directed.
+SELECT
+	ND.DIRECTOR,
+	COUNT(
+		DISTINCT CASE
+			WHEN TYPE = 'Movie' THEN N.SHOW_ID
+		END
+	) AS NO_OF_MOVIES,
+	COUNT(
+		DISTINCT CASE
+			WHEN TYPE = 'TV Show' THEN N.SHOW_ID
+		END
+	) AS NO_OF_TVSHOWS
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_DIRECTOR ND ON N.SHOW_ID = ND.SHOW_ID
+GROUP BY
+	ND.DIRECTOR
+HAVING
+	COUNT(DISTINCT N.TYPE) > 1
+
+
+-- 17.  Which country has highest number of comedy movies.
+SELECT
+	NC.COUNTRY,
+	COUNT(DISTINCT NG.SHOW_ID) AS NO_OF_MOVIES
+FROM
+	NETFLIX_COUNTRY NC
+	INNER JOIN NETFLIX_GENRE NG ON NC.SHOW_ID = NG.SHOW_ID
+	INNER JOIN NETFLIX1 N ON NG.SHOW_ID = N.SHOW_ID
+WHERE
+	NG.GENRE = 'Comedies'
+	AND N.TYPE = 'Movie'
+GROUP BY
+	NC.COUNTRY
+ORDER BY
+	2 DESC
+LIMIT
+	1;
+
+
+-- 18. For each year as per date_added which director has maximum no. of movies released
+
+WITH
+	CTE1 AS (
+		SELECT
+			ND.DIRECTOR,
+			EXTRACT(
+				YEAR
+				FROM
+					N.DATE_ADDED
+			) AS DATE_YEAR,
+			COUNT(N.SHOW_ID) AS TOTAL_MOVIES
+		FROM
+			NETFLIX1 N
+			INNER JOIN NETFLIX_DIRECTOR ND ON N.SHOW_ID = ND.SHOW_ID
+		WHERE
+			N.TYPE = 'Movie'
+		GROUP BY
+			ND.DIRECTOR,
+			DATE_YEAR
+	),
+	CTE2 AS (
+		SELECT
+			*,
+			ROW_NUMBER() OVER (
+				PARTITION BY
+					DATE_YEAR
+				ORDER BY
+					TOTAL_MOVIES DESC
+			) AS RN
+		FROM
+			CTE1
+	)
+SELECT
+	*
+FROM
+	CTE2
+WHERE
+	RN = 1;
+
+
+-- 19. What is the average duration of movies in each genre
+
+SELECT
+	NG.GENRE,
+	CAST(
+		AVG(CAST(REPLACE(DURATION, 'min', '') AS INTEGER)) AS INTEGER
+	) AS AVG_DURATION_IN_MIN
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_GENRE NG ON N.SHOW_ID = NG.SHOW_ID
+WHERE
+	N.TYPE = 'Movie' GROUP BY
+	NG.GENRE;
+
+
+-- 20. Find the list of directors who directed both Horror and comedy movies.
+
+SELECT
+	ND.DIRECTOR,
+	COUNT(
+		DISTINCT CASE
+			WHEN NG.GENRE = 'Horror Movies' THEN N.SHOW_ID
+		END
+	) AS NO_OF_HORROR_MOVIES,
+	COUNT(
+		DISTINCT CASE
+			WHEN NG.GENRE = 'Comedies' THEN N.SHOW_ID
+		END
+	) AS NO_OF_COMEDY_MOVIES
+FROM
+	NETFLIX1 N
+	INNER JOIN NETFLIX_GENRE NG ON N.SHOW_ID = NG.SHOW_ID
+	INNER JOIN NETFLIX_DIRECTOR ND ON N.SHOW_ID = ND.SHOW_ID
+WHERE
+	N.TYPE = 'Movie'
+	AND NG.GENRE IN ('Horror Movies', 'Comedies')
+GROUP BY
+	ND.DIRECTOR
+HAVING
+	COUNT(DISTINCT NG.GENRE) = 2;
+
+
+
+
+
+
